@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cadê Você — Violações</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body class="dashboard-body">
+    <div class="sidebar-backdrop" id="sidebar-backdrop" hidden aria-hidden="true"></div>
+
+    <div class="app-layout">
+      <aside class="sidebar" id="sidebar" aria-label="Menu principal">
+        <div class="sidebar__head">
+          <div class="sidebar__brand">
+            <span class="sidebar__mark" aria-hidden="true">
+              <i class="fa-solid fa-location-crosshairs"></i>
+            </span>
+            <div>
+              <strong class="sidebar__title">Cadê Você</strong>
+              <span class="sidebar__tagline">Rastreamento corporativo</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="sidebar__close"
+            id="sidebar-close"
+            aria-label="Fechar menu"
+          >
+            ×
+          </button>
+        </div>
+        <nav class="sidebar__nav" aria-label="Navegação">
+          <div class="sidebar__section">
+            <h2 class="sidebar__section-title">Geral</h2>
+            <a class="sidebar__item" href="/">
+              <i class="fa-solid fa-map-location-dot sidebar__icon" aria-hidden="true"></i>
+              <span class="sidebar__label">Última localização</span>
+            </a>
+            <a class="sidebar__item" href="/static/history.html">
+              <i class="fa-solid fa-calendar-days sidebar__icon" aria-hidden="true"></i>
+              <span class="sidebar__label">Histórico de localização</span>
+            </a>
+          </div>
+          <div class="sidebar__rule" role="presentation"></div>
+          <div class="sidebar__section">
+            <h2 class="sidebar__section-title">Alertas</h2>
+            <a
+              class="sidebar__item sidebar__item--active"
+              href="/static/violations.html"
+              aria-current="page"
+            >
+              <i class="fa-solid fa-triangle-exclamation sidebar__icon" aria-hidden="true"></i>
+              <span class="sidebar__label">Violações</span>
+            </a>
+          </div>
+          <div class="sidebar__rule" role="presentation"></div>
+          <div class="sidebar__section">
+            <h2 class="sidebar__section-title">Relatórios</h2>
+            <span class="sidebar__item sidebar__item--disabled" title="Em breve">
+              <i class="fa-solid fa-chart-line sidebar__icon" aria-hidden="true"></i>
+              <span class="sidebar__label">Relatórios avançados</span>
+              <span class="sidebar__badge">Em breve</span>
+            </span>
+          </div>
+        </nav>
+      </aside>
+
+      <div class="main-content main-content--page">
+        <div class="subpage-stack subpage-stack--violations">
+          <header class="dashboard-top">
+            <div class="dashboard-top__row">
+              <button
+                type="button"
+                class="sidebar-toggle"
+                id="sidebar-toggle"
+                aria-expanded="false"
+                aria-controls="sidebar"
+                title="Menu"
+              >
+                <i class="fa-solid fa-bars" aria-hidden="true"></i>
+              </button>
+              <div class="main-topbar__titles">
+                <h1 class="main-topbar__heading">Violações</h1>
+                <p class="main-topbar__subtitle muted">
+                  Check-ins fora do estado permitido (mais recentes primeiro)
+                </p>
+              </div>
+              <p id="violations-status" class="dashboard-meta violations-meta"></p>
+            </div>
+          </header>
+
+          <section class="table-wrap table-wrap--dashboard violations-table-block" aria-label="Lista">
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Horário (UTC)</th>
+                    <th>Hostname</th>
+                    <th>Usuário</th>
+                    <th>IP</th>
+                    <th>Região</th>
+                    <th>Cidade</th>
+                    <th>Permitido</th>
+                  </tr>
+                </thead>
+                <tbody id="violations-rows"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/violations.js"></script>
+  </body>
+</html>

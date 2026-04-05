@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cadê Você — Dashboard</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+    <!-- Relativo à URL "/" → mesmo host; abrindo index.html no disco → style.css na pasta dashboard -->
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="dashboard-body">
+    <div
+      class="sidebar-backdrop"
+      id="sidebar-backdrop"
+      hidden
+      aria-hidden="true"
+    ></div>
+
+    <div class="app-layout">
+      <aside class="sidebar" id="sidebar" aria-label="Menu principal">
+        <div class="sidebar__head">
+          <div class="sidebar__brand">
+            <span class="sidebar__mark" aria-hidden="true">
+              <i class="fa-solid fa-location-crosshairs"></i>
+            </span>
+            <div>
+              <strong class="sidebar__title">Cadê Você</strong>
+              <span class="sidebar__tagline">Rastreamento corporativo</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="sidebar__close"
+            id="sidebar-close"
+            aria-label="Fechar menu"
+          >
+            ×
+          </button>
+        </div>
+        <nav class="sidebar__nav" aria-label="Navegação">
+          <div class="sidebar__section">
+            <h2 class="sidebar__section-title">Geral</h2>
+            <a
+              class="sidebar__item sidebar__item--active"
+              href="/"
+              aria-current="page"
+            >
+              <i class="fa-solid fa-map-location-dot sidebar__icon" aria-hidden="true"></i>
+              <span class="sidebar__label">Última localização</span>
+            </a>
+            <a class="sidebar__item" href="/static/history.html">
+              <i class="fa-solid fa-calendar-days sidebar__icon" aria-hidden="true"></i>
+              <span class="sidebar__label">Histórico de localização</span>
+            </a>
+          </div>
+          <div class="sidebar__rule" role="presentation"></div>
+          <div class="sidebar__section">
+            <h2 class="sidebar__section-title">Alertas</h2>
+            <a class="sidebar__item" href="/static/violations.html">
+              <i class="fa-solid fa-triangle-exclamation sidebar__icon" aria-hidden="true"></i>
+              <span class="sidebar__label">Violações</span>
+            </a>
+          </div>
+          <div class="sidebar__rule" role="presentation"></div>
+          <div class="sidebar__section">
+            <h2 class="sidebar__section-title">Relatórios</h2>
+            <span class="sidebar__item sidebar__item--disabled" title="Em breve">
+              <i class="fa-solid fa-chart-line sidebar__icon" aria-hidden="true"></i>
+              <span class="sidebar__label">Relatórios avançados</span>
+              <span class="sidebar__badge">Em breve</span>
+            </span>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Área principal: mapa em destaque (estilo painéis mapa-centrados) -->
+      <div class="main-content main-content--dashboard">
+        <div class="dashboard-map-stack">
+          <header class="dashboard-top">
+            <div class="dashboard-top__row">
+              <button
+                type="button"
+                class="sidebar-toggle"
+                id="sidebar-toggle"
+                aria-expanded="false"
+                aria-controls="sidebar"
+                title="Menu"
+              >
+                <i class="fa-solid fa-bars" aria-hidden="true"></i>
+              </button>
+
+              <div class="dash-toolbar" aria-label="Filtros">
+                <div class="dash-field dash-field--search">
+                  <label class="dash-label" for="filter-search">Buscar</label>
+                  <div class="dash-input-wrap">
+                    <i class="fa-solid fa-magnifying-glass dash-input-icon" aria-hidden="true"></i>
+                    <input
+                      type="search"
+                      id="filter-search"
+                      class="dash-input"
+                      placeholder="Hostname ou usuário"
+                      autocomplete="off"
+                    />
+                  </div>
+                </div>
+                <div class="dash-field">
+                  <label class="dash-label" for="filter-status">Status</label>
+                  <select id="filter-status" class="dash-select">
+                    <option value="all">Todos</option>
+                    <option value="ok">OK</option>
+                    <option value="violation">Violação</option>
+                    <option value="none">Sem check-in</option>
+                  </select>
+                </div>
+                <div class="dash-field">
+                  <label class="dash-label" for="filter-source">Fonte</label>
+                  <select id="filter-source" class="dash-select">
+                    <option value="all">Todos</option>
+                    <option value="gps_all">GPS (Windows ou USB)</option>
+                    <option value="gps">Só GPS Windows</option>
+                    <option value="gps_serial">Só GPS USB</option>
+                    <option value="ip">IP</option>
+                  </select>
+                </div>
+                <div class="dash-field dash-field--action">
+                  <span class="dash-label dash-label--spacer" aria-hidden="true">&nbsp;</span>
+                  <button type="button" class="dash-btn-refresh" id="btn-refresh" title="Atualizar dados">
+                    <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>
+                    <span>Atualizar</span>
+                  </button>
+                </div>
+              </div>
+
+              <p class="dashboard-meta" id="last-refresh">Carregando…</p>
+            </div>
+
+            <!-- Resumo compacto em linha -->
+            <div class="dash-stats" aria-label="Resumo">
+              <div class="dash-stat">
+                <span class="dash-stat__label">Dispositivos</span>
+                <span id="stat-total" class="dash-stat__value">—</span>
+              </div>
+              <div class="dash-stat dash-stat--ok">
+                <span class="dash-stat__label">OK</span>
+                <span id="stat-ok" class="dash-stat__value">—</span>
+              </div>
+              <div class="dash-stat dash-stat--bad">
+                <span class="dash-stat__label">Violação</span>
+                <span id="stat-violation" class="dash-stat__value">—</span>
+              </div>
+              <div class="dash-stat dash-stat--vpn">
+                <span class="dash-stat__label">VPN</span>
+                <span id="stat-vpn" class="dash-stat__value">—</span>
+              </div>
+            </div>
+          </header>
+
+          <div class="map-viewport" aria-label="Mapa">
+            <div id="map"></div>
+          </div>
+        </div>
+
+        <section class="table-wrap table-wrap--dashboard" id="devices-section" aria-label="Lista de dispositivos">
+          <h2 class="table-wrap__title">Dispositivos</h2>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Hostname</th>
+                  <th>Usuário</th>
+                  <th>Fonte</th>
+                  <th>Precisão</th>
+                  <th>IP</th>
+                  <th>Região</th>
+                  <th>Cidade</th>
+                  <th class="col-hide-sm">Permitido</th>
+                  <th>Status</th>
+                  <th>VPN</th>
+                  <th>Último check-in</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="device-rows"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="app.js"></script>
+  </body>
+</html>
