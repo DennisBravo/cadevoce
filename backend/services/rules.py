@@ -100,7 +100,7 @@ async def _fechar_janelas_abertas(
     r = await session.execute(
         select(ViolationWindow).where(
             ViolationWindow.device_id == device_id,
-            ViolationWindow.resolved.is_(False),
+            ViolationWindow.resolved == False,
         )
     )
     for w in r.scalars().all():
@@ -134,7 +134,7 @@ async def apply_violation_timing(
     r = await session.execute(
         select(ViolationWindow).where(
             ViolationWindow.device_id == device_id,
-            ViolationWindow.resolved.is_(False),
+            ViolationWindow.resolved == False,
         )
     )
     aberta = r.scalar_one_or_none()
