@@ -4,6 +4,8 @@
 
 const API_BASE = "";
 const REFRESH_MS = 2 * 60 * 1000;
+/** Envia cookies da sessão admin (HttpOnly) nas chamadas à mesma origem */
+const fetchCreds = { credentials: "same-origin" };
 
 /** Check-in com coordenadas do agente (Windows Location ou USB NMEA). */
 function isGpsSource(raw) {
@@ -20,20 +22,6 @@ const markersByKey = new Map();
 
 function el(id) {
   return document.getElementById(id);
-}
-
-/** Mesma chave do agente / API_SECRET_KEY; meta name="cadevoce-api-key" ou window.CADEVOCE_API_KEY */
-function getDashboardApiKey() {
-  const meta = document.querySelector('meta[name="cadevoce-api-key"]');
-  const fromMeta = meta?.getAttribute("content")?.trim();
-  if (fromMeta) return fromMeta;
-  if (
-    typeof window.CADEVOCE_API_KEY === "string" &&
-    window.CADEVOCE_API_KEY.trim()
-  ) {
-    return window.CADEVOCE_API_KEY.trim();
-  }
-  return "";
 }
 
 /** Chave única para casar linha da tabela com marcador no mapa */
@@ -366,7 +354,7 @@ function invalidateMapSize() {
 }
 
 async function loadDevices() {
-  const res = await fetch(`${API_BASE}/devices`);
+  const res = await fetch(`${API_BASE}/devices`, fetchCreds);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   allDevices = await res.json();
   refreshView();
@@ -374,21 +362,100 @@ async function loadDevices() {
     "Atualizado: " + new Date().toLocaleString("pt-BR");
 }
 
-async function deleteDevice(hostname, username) {
-  const key = getDashboardApiKey();
+async function refreshSessionUi() {
+  const openBtn = el("btn-auth-open");
+  const outBtn = el("btn-auth-logout");
+  if (!openBtn || !outBtn) return;
+  try {
+    const r = await fetch(`${API_BASE}/auth/browser/me`, fetchCreds);
+    const j = await r.json();
+    const authed = j.authenticated === true;
+    openBtn.hidden = authed;
+    outBtn.hidden = !authed;
+  } catch {
+    openBtn.hidden = false;
+    outBtn.hidden = true;
+  }
+}
+
+function openAuthModal() {
+  const modal = el("auth-modal");
+  const err = el("auth-modal-err");
+  const input = el("auth-api-key");
+  if (!modal || !input) return;
+  if (err) {
+    err.hidden = true;
+    err.textContent = "";
+  }
+  input.value = "";
+  modal.hidden = false;
+  input.focus();
+}
+
+function closeAuthModal() {
+  const modal = el("auth-modal");
+  if (modal) modal.hidden = true;
+}
+
+async function submitAuthModal() {
+  const input = el("auth-api-key");
+  const errEl = el("auth-modal-err");
+  const key = (input?.value || "").trim();
   if (!key) {
-    alert(
-      "Configure a chave da API no dashboard: preencha a meta cadevoce-api-key no index.html ou defina window.CADEVOCE_API_KEY (mesmo valor de API_SECRET_KEY no servidor)."
-    );
+    if (errEl) {
+      errEl.textContent = "Informe a chave.";
+      errEl.hidden = false;
+    }
     return;
   }
+  const res = await fetch(`${API_BASE}/auth/browser/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ api_key: key }),
+    ...fetchCreds,
+  });
+  if (!res.ok) {
+    let msg = "Chave inválida.";
+    try {
+      const j = await res.json();
+      if (j.detail) msg = typeof j.detail === "string" ? j.detail : msg;
+    } catch {
+      /* ignore */
+    }
+    if (errEl) {
+      errEl.textContent = msg;
+      errEl.hidden = false;
+    }
+    return;
+  }
+  closeAuthModal();
+  await refreshSessionUi();
+}
+
+async function logoutAdminSession() {
+  try {
+    await fetch(`${API_BASE}/auth/browser/logout`, {
+      method: "POST",
+      ...fetchCreds,
+    });
+  } catch {
+    /* ignore */
+  }
+  await refreshSessionUi();
+}
+
+async function deleteDevice(hostname, username) {
   const msg = `Deseja excluir o dispositivo ${hostname}/${username}? Esta ação não pode ser desfeita.`;
   if (!confirm(msg)) return;
   const params = new URLSearchParams({ hostname, username });
   const res = await fetch(`${API_BASE}/devices?${params}`, {
     method: "DELETE",
-    headers: { "X-API-Key": key },
+    ...fetchCreds,
   });
+  if (res.status === 401) {
+    openAuthModal();
+    throw new Error("Inicie a sessão administrativa (Entrar) para excluir dispositivos.");
+  }
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
     try {
@@ -421,6 +488,23 @@ document.addEventListener("DOMContentLoaded", () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(invalidateMapSize, 120);
   });
+
+  el("btn-auth-open")?.addEventListener("click", () => openAuthModal());
+  el("btn-auth-logout")?.addEventListener("click", () => logoutAdminSession());
+  el("auth-modal-submit")?.addEventListener("click", () => {
+    submitAuthModal().catch((e) => console.error(e));
+  });
+  el("auth-modal")?.querySelectorAll("[data-auth-close]").forEach((node) => {
+    node.addEventListener("click", () => closeAuthModal());
+  });
+  el("auth-api-key")?.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      submitAuthModal().catch((err) => console.error(err));
+    }
+  });
+
+  refreshSessionUi();
 
   el("btn-refresh").addEventListener("click", () => tick());
 

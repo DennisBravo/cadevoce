@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     teams_webhook_url: str | None = None
     database_url: str = "sqlite+aiosqlite:///./cadevoce.db"
     api_secret_key: str
+    # Cookie de sessão do dashboard (login em /auth/browser/login): True em HTTPS (Azure)
+    cookie_secure: bool = False
     # Azure Maps — usado no reverse geocoding quando o agente envia GPS
     azure_maps_key: str | None = None
     # Minutos fora do estado antes do primeiro alerta Teams

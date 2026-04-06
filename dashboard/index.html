@@ -21,6 +21,36 @@
   </head>
   <body class="dashboard-body">
     <div
+      id="auth-modal"
+      class="auth-modal"
+      hidden
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="auth-modal-title"
+    >
+      <button type="button" class="auth-modal__backdrop" data-auth-close tabindex="-1" aria-label="Fechar"></button>
+      <div class="auth-modal__panel">
+        <h2 id="auth-modal-title" class="auth-modal__title">Sessão administrativa</h2>
+        <p class="auth-modal__hint muted">
+          Use a mesma chave do agente (<code>API_SECRET_KEY</code>). Ela não fica no HTML: após entrar, o navegador guarda um cookie <strong>HttpOnly</strong> (8 h).
+        </p>
+        <label class="auth-modal__label" for="auth-api-key">Chave de API</label>
+        <input
+          type="password"
+          id="auth-api-key"
+          class="auth-modal__input dash-input"
+          autocomplete="current-password"
+          spellcheck="false"
+        />
+        <p id="auth-modal-err" class="auth-modal__err" hidden></p>
+        <div class="auth-modal__actions">
+          <button type="button" class="btn-action" id="auth-modal-cancel" data-auth-close>Cancelar</button>
+          <button type="button" class="dash-btn-refresh" id="auth-modal-submit">Entrar</button>
+        </div>
+      </div>
+    </div>
+
+    <div
       class="sidebar-backdrop"
       id="sidebar-backdrop"
       hidden
@@ -132,6 +162,19 @@
                     <option value="gps_serial">Só GPS USB</option>
                     <option value="ip">IP</option>
                   </select>
+                </div>
+                <div class="dash-field dash-field--session">
+                  <span class="dash-label" id="session-label">Admin</span>
+                  <div class="dash-session-btns">
+                    <button type="button" class="dash-btn-session" id="btn-auth-open" title="Iniciar sessão para excluir dispositivos">
+                      <i class="fa-solid fa-key" aria-hidden="true"></i>
+                      <span>Entrar</span>
+                    </button>
+                    <button type="button" class="dash-btn-session dash-btn-session--out" id="btn-auth-logout" hidden title="Encerrar sessão administrativa">
+                      <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+                      <span>Sair</span>
+                    </button>
+                  </div>
                 </div>
                 <div class="dash-field dash-field--action">
                   <span class="dash-label dash-label--spacer" aria-hidden="true">&nbsp;</span>

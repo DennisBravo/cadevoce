@@ -813,6 +813,120 @@ button.btn-action:disabled {
   border-color: var(--bad);
 }
 
+/* Sessão admin (dashboard): login sem chave no HTML */
+.dash-field--session .dash-session-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.dash-btn-session {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 0.35rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.dash-btn-session:hover {
+  color: var(--text);
+  border-color: var(--accent);
+  background: rgba(52, 152, 219, 0.1);
+}
+
+.dash-btn-session--out:hover {
+  border-color: var(--bad);
+  color: var(--bad);
+  background: rgba(231, 76, 60, 0.08);
+}
+
+.auth-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.auth-modal[hidden] {
+  display: none !important;
+}
+
+.auth-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+}
+
+.auth-modal__panel {
+  position: relative;
+  z-index: 1;
+  width: min(420px, 100%);
+  padding: 1.25rem 1.35rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.auth-modal__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.auth-modal__hint {
+  margin: 0 0 1rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.auth-modal__hint code {
+  font-size: 0.8em;
+  color: var(--accent);
+}
+
+.auth-modal__label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.auth-modal__input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 0.75rem;
+}
+
+.auth-modal__err {
+  color: var(--bad);
+  font-size: 0.82rem;
+  margin: 0 0 0.75rem;
+}
+
+.auth-modal__actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

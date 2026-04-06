@@ -14,7 +14,7 @@ from backend.models.database import (
     Device,
     ViolationWindow,
 )
-from backend.routes.checkin import require_api_key
+from backend.routes.auth_session import require_api_key_or_browser_session
 
 router = APIRouter(tags=["devices"])
 
@@ -202,7 +202,11 @@ async def list_violations(
         ]
 
 
-@router.delete("/devices", response_model=dict, dependencies=[Depends(require_api_key)])
+@router.delete(
+    "/devices",
+    response_model=dict,
+    dependencies=[Depends(require_api_key_or_browser_session)],
+)
 async def delete_device(hostname: str, username: str):
     """Remove um dispositivo e todos os seus check-ins."""
     async with AsyncSessionLocal() as session:

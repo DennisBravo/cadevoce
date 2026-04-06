@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.models.database import init_db
-from backend.routes import checkin, devices, history
+from backend.routes import auth_session, checkin, devices, history
 
 # Diretório do projeto (pasta que contém backend/ e dashboard/)
 ROOT = Path(__file__).resolve().parent.parent
@@ -37,6 +37,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_session.router)
 app.include_router(checkin.router)
 app.include_router(devices.router)
 app.include_router(history.router)
