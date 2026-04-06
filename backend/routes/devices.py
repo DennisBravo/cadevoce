@@ -40,6 +40,8 @@ class DeviceRow(BaseModel):
     estado_permitido: str
     source: str | None = "ip"
     accuracy: float | None = None
+    last_boot_utc: datetime | None = None
+    uptime_seconds: float | None = None
 
     model_config = {"from_attributes": False}
 
@@ -125,6 +127,8 @@ async def list_devices():
                     estado_permitido=device.estado_permitido,
                     source=checkin.source or "ip",
                     accuracy=checkin.accuracy,
+                    last_boot_utc=checkin.last_boot_utc,
+                    uptime_seconds=checkin.uptime_seconds,
                 )
             )
 
@@ -150,6 +154,8 @@ async def list_devices():
                         estado_permitido=d.estado_permitido,
                         source=None,
                         accuracy=None,
+                        last_boot_utc=None,
+                        uptime_seconds=None,
                     )
                 )
 

@@ -55,6 +55,10 @@ class Checkin(Base):
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     accuracy: Mapped[float | None] = mapped_column(Float, nullable=True)
+    last_boot_utc: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    uptime_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     device: Mapped["Device"] = relationship(back_populates="checkins")
 
@@ -109,6 +113,10 @@ def _migrate_sqlite_checkins(connection) -> None:
         statements.append("ALTER TABLE checkins ADD COLUMN longitude REAL")
     if "accuracy" not in existing:
         statements.append("ALTER TABLE checkins ADD COLUMN accuracy REAL")
+    if "last_boot_utc" not in existing:
+        statements.append("ALTER TABLE checkins ADD COLUMN last_boot_utc TIMESTAMP")
+    if "uptime_seconds" not in existing:
+        statements.append("ALTER TABLE checkins ADD COLUMN uptime_seconds REAL")
     for stmt in statements:
         connection.execute(text(stmt))
 

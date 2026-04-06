@@ -154,6 +154,21 @@ function formatTime(iso) {
   }
 }
 
+/** Segundos desde o boot → texto curto (ex.: 2d 5h, 3h 12min). */
+function formatUptimeSeconds(sec) {
+  if (sec == null || !Number.isFinite(Number(sec)) || Number(sec) < 0) return "—";
+  let s = Math.floor(Number(sec));
+  const days = Math.floor(s / 86400);
+  s %= 86400;
+  const hours = Math.floor(s / 3600);
+  s %= 3600;
+  const mins = Math.floor(s / 60);
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${mins}min`;
+  if (mins > 0) return `${mins}min`;
+  return `${Math.max(0, s)}s`;
+}
+
 function formatAccuracy(r) {
   if (!isGpsSource(r.source) || r.accuracy == null) return "—";
   return "±" + Math.round(r.accuracy) + " m";
@@ -219,6 +234,9 @@ function renderTable(rows) {
       const uAttr = escapeAttr(r.username);
       const canCenter =
         r.lat != null && r.lon != null && r.status != null ? "" : " disabled";
+      const bootStr =
+        r.last_boot_utc != null ? formatTime(r.last_boot_utc) : "—";
+      const upStr = formatUptimeSeconds(r.uptime_seconds);
       return `<tr>
         <td>${hEsc}</td>
         <td>${uEsc}</td>
@@ -230,6 +248,8 @@ function renderTable(rows) {
         <td class="col-hide-sm">${escapeHtml(r.estado_permitido)}</td>
         <td><span class="badge ${badgeClass}">${badgeText}</span></td>
         <td>${vpnCell}</td>
+        <td class="col-hide-sm muted">${escapeHtml(bootStr)}</td>
+        <td class="muted" title="No momento do último check-in">${escapeHtml(upStr)}</td>
         <td class="muted">${formatTime(r.last_seen)}</td>
         <td class="table-actions">
           <a class="btn-action" href="${escapeHtml(histUrl)}" title="Ver histórico">📅 Histórico</a>
@@ -278,6 +298,14 @@ function renderMap(rows) {
     const vpnNote = r.vpn_detected
       ? "<br/><strong>VPN/proxy:</strong> indicado (ip-api)"
       : "";
+    const bootNote =
+      r.last_boot_utc != null
+        ? `<br/><strong>Último boot:</strong> ${escapeHtml(formatTime(r.last_boot_utc))}`
+        : "";
+    const upNote =
+      r.uptime_seconds != null
+        ? `<br/><strong>Ligado há (no check-in):</strong> ${escapeHtml(formatUptimeSeconds(r.uptime_seconds))}`
+        : "";
     m.bindPopup(
       `<strong>${escapeHtml(r.hostname)}</strong><br/>` +
         `${escapeHtml(r.username)}<br/>` +
@@ -286,6 +314,8 @@ function renderMap(rows) {
         `<strong>IP:</strong> ${escapeHtml(r.ip ?? "—")}<br/>` +
         `<strong>Status:</strong> ${escapeHtml(r.status)}` +
         vpnNote +
+        bootNote +
+        upNote +
         `<br/><strong>Último check-in:</strong> ${escapeHtml(formatTime(r.last_seen))}`
     );
     layerGroup.addLayer(m);

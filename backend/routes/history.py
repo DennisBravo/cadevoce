@@ -22,6 +22,8 @@ class HistoryRow(BaseModel):
     region: str | None
     city: str | None
     status: str
+    last_boot_utc: datetime | None = None
+    uptime_seconds: float | None = None
 
 
 def _day_bounds_utc(d: date) -> tuple[datetime, datetime]:
@@ -119,6 +121,8 @@ async def history_for_day(
                 region=c.region,
                 city=c.city,
                 status=c.status.value,
+                last_boot_utc=c.last_boot_utc,
+                uptime_seconds=c.uptime_seconds,
             )
             for c in rows
         ]

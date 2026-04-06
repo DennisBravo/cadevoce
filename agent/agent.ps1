@@ -11,6 +11,7 @@
   CADEVOCE_GPS_TIMEOUT=25 (segundos para obter fix NMEA).
   GeoHelper: dotnet publish agent\GeoHelper (Release, win-x64, self-contained -> ./publish).
   Agendamento sugerido: 10 min, oculto (Task Scheduler).
+  Envia last_boot_utc (ISO UTC) e uptime_seconds (CIM Win32_OperatingSystem) para o painel.
 #>
 
 param()
@@ -44,6 +45,30 @@ function Write-Log {
 
 function Get-PublicIp {
     (Invoke-RestMethod -Uri 'https://api.ipify.org?format=json' -TimeoutSec 20).ip
+}
+
+<#
+  Ultimo boot em UTC (ISO) e segundos desde o boot — mesmo padrao de inventario / help desk.
+#>
+function Get-CadeVoceHostMetrics {
+    $bootIso = $null
+    $uptimeSec = $null
+    try {
+        $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+        if ($null -ne $os -and $null -ne $os.LastBootUpTime) {
+            $bootUtc = $os.LastBootUpTime.ToUniversalTime()
+            $bootIso = $bootUtc.ToString('o')
+            $sec = [math]::Floor(([DateTime]::UtcNow - $bootUtc).TotalSeconds)
+            if ($sec -ge 0 -and $sec -lt 366 * 24 * 3600) { $uptimeSec = $sec }
+        }
+    }
+    catch {
+        Write-Log -Message ('Metricas de boot (CIM): {0}' -f $_.Exception.Message) -Level 'WARN'
+    }
+    return @{
+        last_boot_utc    = $bootIso
+        uptime_seconds   = $uptimeSec
+    }
 }
 
 <#
@@ -262,20 +287,24 @@ try {
         }
     }
 
+    $hostMetrics = Get-CadeVoceHostMetrics
+
     if (-not $useGps) {
         $publicIp = Get-PublicIp
         if (-not $publicIp) {
             throw 'IP publico vazio'
         }
         $body = [ordered]@{
-            hostname  = $env:COMPUTERNAME
-            username  = $env:USERNAME
-            source    = 'ip'
-            latitude  = $null
-            longitude = $null
-            accuracy  = $null
-            ip        = $publicIp
-            timestamp = (Get-Date).ToUniversalTime().ToString('o')
+            hostname         = $env:COMPUTERNAME
+            username         = $env:USERNAME
+            source           = 'ip'
+            latitude         = $null
+            longitude        = $null
+            accuracy         = $null
+            ip               = $publicIp
+            timestamp        = (Get-Date).ToUniversalTime().ToString('o')
+            last_boot_utc    = $hostMetrics.last_boot_utc
+            uptime_seconds   = $hostMetrics.uptime_seconds
         }
     }
     else {
@@ -287,14 +316,16 @@ try {
         }
         $checkinSource = if ($gpsOrigin -eq 'serial') { 'gps_serial' } else { 'gps' }
         $body = [ordered]@{
-            hostname  = $env:COMPUTERNAME
-            username  = $env:USERNAME
-            source    = $checkinSource
-            latitude  = $lat
-            longitude = $lon
-            accuracy  = $acc
-            ip        = $publicIp
-            timestamp = (Get-Date).ToUniversalTime().ToString('o')
+            hostname         = $env:COMPUTERNAME
+            username         = $env:USERNAME
+            source           = $checkinSource
+            latitude         = $lat
+            longitude        = $lon
+            accuracy         = $acc
+            ip               = $publicIp
+            timestamp        = (Get-Date).ToUniversalTime().ToString('o')
+            last_boot_utc    = $hostMetrics.last_boot_utc
+            uptime_seconds   = $hostMetrics.uptime_seconds
         }
     }
 

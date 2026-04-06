@@ -29,6 +29,15 @@ class CheckinBody(BaseModel):
     longitude: float | None = None
     accuracy: float | None = None
     ip: str | None = Field(None, max_length=45)
+    last_boot_utc: str | None = Field(
+        None,
+        description="ISO 8601 UTC do último boot (Win32_OperatingSystem)",
+    )
+    uptime_seconds: float | None = Field(
+        None,
+        ge=0,
+        description="Segundos desde o boot no momento do check-in",
+    )
 
     @model_validator(mode="after")
     def validar_fonte(self):
@@ -53,6 +62,19 @@ def _parse_ts(raw: str) -> datetime:
         return dt.astimezone(timezone.utc)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"timestamp inválido: {e}") from e
+
+
+def _parse_optional_boot(raw: str | None) -> datetime | None:
+    if raw is None or not str(raw).strip():
+        return None
+    try:
+        t = str(raw).strip().replace("Z", "+00:00")
+        dt = datetime.fromisoformat(t)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"last_boot_utc inválido: {e}") from e
 
 
 async def require_api_key(x_api_key: str | None = Header(None, alias="X-API-Key")):
@@ -121,6 +143,11 @@ async def checkin(body: CheckinBody):
             map_lat = float(raw_lat) if src in ("gps", "gps_serial") else geo.lat
             map_lon = float(raw_lon) if src in ("gps", "gps_serial") else geo.lon
 
+            boot_dt = _parse_optional_boot(body.last_boot_utc)
+            up_sec = body.uptime_seconds
+            if up_sec is not None and up_sec > 366 * 24 * 3600:
+                up_sec = None
+
             row = Checkin(
                 device_id=device.id,
                 ip=ip_stored,
@@ -136,6 +163,8 @@ async def checkin(body: CheckinBody):
                 latitude=raw_lat if src in ("gps", "gps_serial") else None,
                 longitude=raw_lon if src in ("gps", "gps_serial") else None,
                 accuracy=raw_acc if src in ("gps", "gps_serial") else None,
+                last_boot_utc=boot_dt,
+                uptime_seconds=up_sec,
             )
             session.add(row)
             await session.commit()

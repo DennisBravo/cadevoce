@@ -123,6 +123,20 @@ function formatTimeUtc(iso) {
   }
 }
 
+function formatUptimeSeconds(sec) {
+  if (sec == null || !Number.isFinite(Number(sec)) || Number(sec) < 0) return "—";
+  let s = Math.floor(Number(sec));
+  const days = Math.floor(s / 86400);
+  s %= 86400;
+  const hours = Math.floor(s / 3600);
+  s %= 3600;
+  const mins = Math.floor(s / 60);
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${mins}min`;
+  if (mins > 0) return `${mins}min`;
+  return `${Math.max(0, s)}s`;
+}
+
 /** Precisão em metros ou traço se não for GPS. */
 function formatAccuracy(row) {
   if (!isGpsSource(row.source) || row.accuracy == null) return "—";
@@ -306,13 +320,23 @@ function renderMap(rows) {
         : isGpsSource(r.source)
           ? "GPS Windows"
           : "IP";
+    const bootLine =
+      r.last_boot_utc != null
+        ? `<br/><strong>Boot:</strong> ${escapeHtml(formatTimeUtc(r.last_boot_utc))}`
+        : "";
+    const upLine =
+      r.uptime_seconds != null
+        ? `<br/><strong>Ligado há:</strong> ${escapeHtml(formatUptimeSeconds(r.uptime_seconds))}`
+        : "";
     m.bindPopup(
       `<strong>${escapeHtml(formatTimeUtc(r.timestamp))}</strong><br/>` +
         `<strong>Fonte:</strong> ${escapeHtml(fonte)}<br/>` +
         `<strong>Precisão:</strong> ${escapeHtml(formatAccuracy(r))}<br/>` +
         `<strong>Região:</strong> ${escapeHtml(r.region ?? "—")}<br/>` +
         `<strong>Cidade:</strong> ${escapeHtml(r.city ?? "—")}<br/>` +
-        `<strong>Status:</strong> ${escapeHtml(r.status)}`
+        `<strong>Status:</strong> ${escapeHtml(r.status)}` +
+        bootLine +
+        upLine
     );
     layerGroup.addLayer(m);
     fitBoundsPoints.push([lat, lon]);
@@ -348,7 +372,7 @@ function renderTable(rows) {
   const tbody = el("history-rows");
   if (!rows.length) {
     tbody.innerHTML =
-      '<tr><td colspan="8" class="muted">Nenhum check-in neste dia.</td></tr>';
+      '<tr><td colspan="10" class="muted">Nenhum check-in neste dia.</td></tr>';
     return;
   }
   tbody.innerHTML = rows
@@ -361,6 +385,9 @@ function renderTable(rows) {
       }
       const latStr = r.lat != null ? String(r.lat) : "—";
       const lonStr = r.lon != null ? String(r.lon) : "—";
+      const bootStr =
+        r.last_boot_utc != null ? formatTimeUtc(r.last_boot_utc) : "—";
+      const upStr = formatUptimeSeconds(r.uptime_seconds);
       return `<tr>
         <td class="muted">${escapeHtml(formatTimeUtc(r.timestamp))}</td>
         <td>${escapeHtml(latStr)}</td>
@@ -369,6 +396,8 @@ function renderTable(rows) {
         <td class="muted">${escapeHtml(formatAccuracy(r))}</td>
         <td>${escapeHtml(r.region ?? "—")}</td>
         <td>${escapeHtml(r.city ?? "—")}</td>
+        <td class="muted">${escapeHtml(bootStr)}</td>
+        <td class="muted">${escapeHtml(upStr)}</td>
         <td><span class="badge ${badgeClass}">${badgeText}</span></td>
       </tr>`;
     })
@@ -385,6 +414,8 @@ function exportCsv(rows, hostname, username, dateStr) {
     "accuracy_m",
     "region",
     "city",
+    "last_boot_utc",
+    "uptime_seconds",
     "status",
   ];
   const lines = [header.join(",")];
@@ -401,6 +432,8 @@ function exportCsv(rows, hostname, username, dateStr) {
       acc,
       csvEscape(r.region),
       csvEscape(r.city),
+      r.last_boot_utc ?? "",
+      r.uptime_seconds != null ? String(r.uptime_seconds) : "",
       r.status,
     ];
     lines.push(cells.join(","));
