@@ -22,6 +22,20 @@ function el(id) {
   return document.getElementById(id);
 }
 
+/** Mesma chave do agente / API_SECRET_KEY; meta name="cadevoce-api-key" ou window.CADEVOCE_API_KEY */
+function getDashboardApiKey() {
+  const meta = document.querySelector('meta[name="cadevoce-api-key"]');
+  const fromMeta = meta?.getAttribute("content")?.trim();
+  if (fromMeta) return fromMeta;
+  if (
+    typeof window.CADEVOCE_API_KEY === "string" &&
+    window.CADEVOCE_API_KEY.trim()
+  ) {
+    return window.CADEVOCE_API_KEY.trim();
+  }
+  return "";
+}
+
 /** Chave única para casar linha da tabela com marcador no mapa */
 function deviceKey(r) {
   return `${r.hostname}\n${r.username}`;
@@ -232,6 +246,7 @@ function renderTable(rows) {
         <td class="table-actions">
           <a class="btn-action" href="${escapeHtml(histUrl)}" title="Ver histórico">📅 Histórico</a>
           <button type="button" class="btn-action"${canCenter} data-action="center" data-hostname="${hAttr}" data-username="${uAttr}" title="Centralizar no mapa">📍 Mapa</button>
+          <button type="button" class="btn-action btn-action--danger" data-action="delete" data-hostname="${hAttr}" data-username="${uAttr}" title="Excluir dispositivo">🗑️ Excluir</button>
         </td>
       </tr>`;
     })
@@ -359,6 +374,34 @@ async function loadDevices() {
     "Atualizado: " + new Date().toLocaleString("pt-BR");
 }
 
+async function deleteDevice(hostname, username) {
+  const key = getDashboardApiKey();
+  if (!key) {
+    alert(
+      "Configure a chave da API no dashboard: preencha a meta cadevoce-api-key no index.html ou defina window.CADEVOCE_API_KEY (mesmo valor de API_SECRET_KEY no servidor)."
+    );
+    return;
+  }
+  const msg = `Deseja excluir o dispositivo ${hostname}/${username}? Esta ação não pode ser desfeita.`;
+  if (!confirm(msg)) return;
+  const params = new URLSearchParams({ hostname, username });
+  const res = await fetch(`${API_BASE}/devices?${params}`, {
+    method: "DELETE",
+    headers: { "X-API-Key": key },
+  });
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const j = await res.json();
+      if (j.detail) detail = typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail);
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+  await loadDevices();
+}
+
 async function tick() {
   try {
     await loadDevices();
@@ -387,6 +430,18 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   el("device-rows").addEventListener("click", (ev) => {
+    const delBtn = ev.target.closest("button[data-action='delete']");
+    if (delBtn) {
+      const hostname = delBtn.getAttribute("data-hostname");
+      const username = delBtn.getAttribute("data-username");
+      if (hostname != null && username != null) {
+        deleteDevice(hostname, username).catch((e) => {
+          console.error(e);
+          alert("Não foi possível excluir: " + e.message);
+        });
+      }
+      return;
+    }
     const btn = ev.target.closest("button[data-action='center']");
     if (!btn || btn.disabled) return;
     const hostname = btn.getAttribute("data-hostname");

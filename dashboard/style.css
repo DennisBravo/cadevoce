@@ -803,6 +803,16 @@ button.btn-action:disabled {
   cursor: not-allowed;
 }
 
+.btn-action--danger {
+  color: var(--bad);
+  border-color: rgba(231, 76, 60, 0.45);
+}
+
+.btn-action--danger:hover:not(:disabled) {
+  background: rgba(231, 76, 60, 0.15);
+  border-color: var(--bad);
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

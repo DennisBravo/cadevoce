@@ -2,7 +2,7 @@
 
 from datetime import date, datetime, time, timezone
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
@@ -14,6 +14,7 @@ from backend.models.database import (
     Device,
     ViolationWindow,
 )
+from backend.routes.checkin import require_api_key
 
 router = APIRouter(tags=["devices"])
 
@@ -201,7 +202,7 @@ async def list_violations(
         ]
 
 
-@router.delete("/devices", response_model=dict)
+@router.delete("/devices", response_model=dict, dependencies=[Depends(require_api_key)])
 async def delete_device(hostname: str, username: str):
     """Remove um dispositivo e todos os seus check-ins."""
     async with AsyncSessionLocal() as session:
