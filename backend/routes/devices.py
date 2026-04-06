@@ -4,10 +4,16 @@ from datetime import date, datetime, time, timezone
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
-from backend.models.database import AsyncSessionLocal, Checkin, CheckinStatus, Device
+from backend.models.database import (
+    AsyncSessionLocal,
+    Checkin,
+    CheckinStatus,
+    Device,
+    ViolationWindow,
+)
 
 router = APIRouter(tags=["devices"])
 
@@ -193,3 +199,25 @@ async def list_violations(
             )
             for c, device in rows
         ]
+
+
+@router.delete("/devices", response_model=dict)
+async def delete_device(hostname: str, username: str):
+    """Remove um dispositivo e todos os seus check-ins."""
+    async with AsyncSessionLocal() as session:
+        r = await session.execute(
+            select(Device).where(
+                Device.hostname == hostname.strip(),
+                Device.username == username.strip(),
+            )
+        )
+        device = r.scalar_one_or_none()
+        if not device:
+            raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
+        await session.execute(
+            delete(ViolationWindow).where(ViolationWindow.device_id == device.id)
+        )
+        await session.execute(delete(Checkin).where(Checkin.device_id == device.id))
+        await session.delete(device)
+        await session.commit()
+        return {"ok": True, "deleted": f"{hostname}/{username}"}
