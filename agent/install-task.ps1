@@ -4,8 +4,11 @@
     Registra a tarefa agendada "CadeVoce-Agent" (check-in a cada 10 min, ao logon).
 
 .DESCRIPTION
-    Cria uma Scheduled Task para o usuário atual: executa agent.ps1 com PowerShell oculto,
-    apenas com sessão interativa (não roda sem login).
+    Cria uma Scheduled Task para o usuário atual: executa agent.ps1 sem janela visível
+    (launcher .vbs com WshShell.Run oculto + PowerShell -WindowStyle Hidden -NonInteractive),
+    tarefa marcada como Hidden no Agendador. Só com sessão interativa (não roda sem login).
+
+    Após atualizar este script, execute-o de novo para recriar a tarefa e o launcher .vbs.
 
 .PARAMETER ApiUrl
     Valor de CADEVOCE_API_URL (padrão: http://127.0.0.1:8000).
@@ -52,7 +55,7 @@ $escUrl = Escape-SingleQuote $ApiUrl
 $escKey = Escape-SingleQuote $ApiKey
 $escScript = Escape-SingleQuote $ScriptPath
 
-# Define variáveis de ambiente e executa o script; WindowStyle Hidden = janela invisível
+# Define variáveis de ambiente e executa o script
 $psCommand = "`$env:CADEVOCE_API_URL='$escUrl'; `$env:CADEVOCE_API_KEY='$escKey'"
 if ($GpsCom -and $GpsCom.Trim()) {
     $escCom = Escape-SingleQuote $GpsCom.Trim()
@@ -66,9 +69,24 @@ $psCommand += "; & '$escScript'"
 # -EncodedCommand (Base64 UTF-16LE): evita problemas de escape na linha de comando da tarefa
 $bytes = [System.Text.Encoding]::Unicode.GetBytes($psCommand)
 $encoded = [Convert]::ToBase64String($bytes)
+
+# Launcher .vbs: WshShell.Run(..., 0, False) = SW_HIDE — evita o flash de console que o
+# Agendador ainda mostra ao iniciar powershell.exe diretamente, mesmo com -WindowStyle Hidden.
+$psExe = Join-Path $PSHOME 'powershell.exe'
+$launcherVbs = Join-Path $PSScriptRoot 'CadeVoce-ScheduledLauncher.vbs'
+$psArgs = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand $encoded"
+$vbsLines = @(
+    'Option Explicit',
+    'Dim sh, cmd',
+    'Set sh = CreateObject("WScript.Shell")',
+    "cmd = ""$psExe $psArgs""",
+    'sh.Run cmd, 0, False'
+)
+Set-Content -LiteralPath $launcherVbs -Value ($vbsLines -join [Environment]::NewLine) -Encoding ASCII
+
 $action = New-ScheduledTaskAction `
-    -Execute (Join-Path $PSHOME 'powershell.exe') `
-    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand $encoded" `
+    -Execute "$env:SystemRoot\System32\wscript.exe" `
+    -Argument "//B //Nologo `"$launcherVbs`"" `
     -WorkingDirectory $PSScriptRoot
 
 # Gatilho: ao fazer login + repetição a cada 10 minutos (duração longa; o Agendador limita o valor máximo de “indefinido” na API)
@@ -81,12 +99,14 @@ $trigger.Repetition = $repeatTemplate.Repetition
 # Só quando o usuário estiver logado (sessão interativa)
 $principal = New-ScheduledTaskPrincipal -UserId $UserId -LogonType Interactive -RunLevel Limited
 
-# Não exige privilégios elevados; ignora nova instância se a anterior ainda estiver em execução
+# Não exige privilégios elevados; ignora nova instância se a anterior ainda estiver em execução;
+# -Hidden = tarefa marcada como oculta nas propriedades do Agendador de Tarefas (UI)
 $settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
     -StartWhenAvailable `
-    -MultipleInstances IgnoreNew
+    -MultipleInstances IgnoreNew `
+    -Hidden
 
 try {
     $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue

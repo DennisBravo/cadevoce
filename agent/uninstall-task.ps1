@@ -16,6 +16,12 @@ try {
     }
 
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+
+    $launcherVbs = Join-Path $PSScriptRoot 'CadeVoce-ScheduledLauncher.vbs'
+    if (Test-Path -LiteralPath $launcherVbs) {
+        Remove-Item -LiteralPath $launcherVbs -Force
+    }
+
     Write-Host "Sucesso: tarefa '$TaskName' removida." -ForegroundColor Green
 }
 catch {
