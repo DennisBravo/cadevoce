@@ -172,6 +172,9 @@ async def list_devices():
                         accuracy=None,
                         last_boot_utc=None,
                         uptime_seconds=None,
+                        os_caption=None,
+                        mac_address=None,
+                        machine_serial=None,
                     )
                 )
 

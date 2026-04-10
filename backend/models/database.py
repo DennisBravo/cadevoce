@@ -131,13 +131,32 @@ def _migrate_sqlite_checkins(connection) -> None:
         connection.execute(text(stmt))
 
 
+def _migrate_postgres_checkins(connection) -> None:
+    """Colunas adicionadas ao modelo após o primeiro deploy (PostgreSQL / Azure)."""
+    stmts = [
+        "ALTER TABLE checkins ADD COLUMN IF NOT EXISTS source VARCHAR(16) NOT NULL DEFAULT 'ip'",
+        "ALTER TABLE checkins ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION",
+        "ALTER TABLE checkins ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION",
+        "ALTER TABLE checkins ADD COLUMN IF NOT EXISTS accuracy DOUBLE PRECISION",
+        "ALTER TABLE checkins ADD COLUMN IF NOT EXISTS last_boot_utc TIMESTAMPTZ",
+        "ALTER TABLE checkins ADD COLUMN IF NOT EXISTS uptime_seconds DOUBLE PRECISION",
+        "ALTER TABLE checkins ADD COLUMN IF NOT EXISTS os_caption VARCHAR(512)",
+        "ALTER TABLE checkins ADD COLUMN IF NOT EXISTS mac_address VARCHAR(64)",
+        "ALTER TABLE checkins ADD COLUMN IF NOT EXISTS machine_serial VARCHAR(128)",
+    ]
+    for stmt in stmts:
+        connection.execute(text(stmt))
+
+
 async def migrate_schema() -> None:
-    """Migração incremental: não remove dados; compatível com SQLite em dev."""
-    url = get_settings().database_url
-    if "sqlite" not in url:
-        return
-    async with engine.begin() as conn:
-        await conn.run_sync(_migrate_sqlite_checkins)
+    """Migração incremental: não remove dados."""
+    url = get_settings().database_url.lower()
+    if "sqlite" in url:
+        async with engine.begin() as conn:
+            await conn.run_sync(_migrate_sqlite_checkins)
+    elif "postgresql" in url or "postgres" in url:
+        async with engine.begin() as conn:
+            await conn.run_sync(_migrate_postgres_checkins)
 
 
 async def init_db():
