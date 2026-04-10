@@ -54,7 +54,7 @@ function applyFilters(rows) {
   const { q, status, source } = readFilters();
   return rows.filter((r) => {
     if (q) {
-      const hay = `${r.hostname} ${r.username}`.toLowerCase();
+      const hay = `${r.hostname} ${r.username} ${r.os_caption ?? ""} ${r.mac_address ?? ""} ${r.machine_serial ?? ""}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     if (status === "ok" && r.status !== "ok") return false;
@@ -237,9 +237,15 @@ function renderTable(rows) {
       const bootStr =
         r.last_boot_utc != null ? formatTime(r.last_boot_utc) : "—";
       const upStr = formatUptimeSeconds(r.uptime_seconds);
+      const osEsc = escapeHtml(r.os_caption ?? "—");
+      const macEsc = escapeHtml(r.mac_address ?? "—");
+      const serEsc = escapeHtml(r.machine_serial ?? "—");
       return `<tr>
         <td>${hEsc}</td>
         <td>${uEsc}</td>
+        <td class="col-hide-sm muted" title="Sistema operacional">${osEsc}</td>
+        <td class="col-hide-sm muted" title="MAC">${macEsc}</td>
+        <td class="col-hide-sm muted" title="Serial">${serEsc}</td>
         <td>${sourceBadge(r)}</td>
         <td class="muted">${escapeHtml(formatAccuracy(r))}</td>
         <td>${escapeHtml(r.ip ?? "—")}</td>
@@ -309,6 +315,9 @@ function renderMap(rows) {
     m.bindPopup(
       `<strong>${escapeHtml(r.hostname)}</strong><br/>` +
         `${escapeHtml(r.username)}<br/>` +
+        `<strong>SO:</strong> ${escapeHtml(r.os_caption ?? "—")}<br/>` +
+        `<strong>MAC:</strong> ${escapeHtml(r.mac_address ?? "—")}<br/>` +
+        `<strong>Serial:</strong> ${escapeHtml(r.machine_serial ?? "—")}<br/>` +
         `<strong>Fonte:</strong> ${fonte}<br/>` +
         `<strong>Precisão:</strong> ${escapeHtml(accLabel)}<br/>` +
         `<strong>IP:</strong> ${escapeHtml(r.ip ?? "—")}<br/>` +

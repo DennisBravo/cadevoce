@@ -12,6 +12,8 @@
   GeoHelper: dotnet publish agent\GeoHelper (Release, win-x64, self-contained -> ./publish).
   Agendamento sugerido: 10 min, oculto (Task Scheduler).
   Envia last_boot_utc (ISO UTC) e uptime_seconds (CIM Win32_OperatingSystem) para o painel.
+  CADEVOCE_ESTADO_PERMITIDO: UF para POST /devices no inicio de cada execucao (cadastro automatico).
+  CADEVOCE_DEBUG=1: imprime JSON no console (apenas diagnostico).
 #>
 
 param()
@@ -50,6 +52,89 @@ function Get-PublicIp {
 <#
   Ultimo boot em UTC (ISO) e segundos desde o boot — mesmo padrao de inventario / help desk.
 #>
+function Get-CadeVoceInventory {
+    $caption = $null
+    $serial = $null
+    $mac = $null
+    try {
+        $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+        if ($null -ne $os -and $os.Caption) {
+            $c = $os.Caption.Trim()
+            $v = $os.Version
+            if ($c) {
+                $caption = if ($v) { '{0} ({1})' -f $c, $v } else { $c }
+            }
+        }
+    }
+    catch {
+        Write-Log -Message ('Inventario SO (CIM): {0}' -f $_.Exception.Message) -Level 'WARN'
+    }
+    try {
+        $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction Stop
+        if ($null -ne $bios -and $bios.SerialNumber) {
+            $sn = $bios.SerialNumber.Trim()
+            $junk = '^(To be filled|Default string|System Serial Number|Not Specified|O\.E\.M\.|0+|)$'
+            if ($sn -and $sn -notmatch $junk) { $serial = $sn }
+        }
+    }
+    catch {
+        Write-Log -Message ('Inventario BIOS (CIM): {0}' -f $_.Exception.Message) -Level 'WARN'
+    }
+    try {
+        $na = Get-NetAdapter -Physical -ErrorAction Stop |
+            Where-Object { $_.Status -eq 'Up' } |
+            Select-Object -First 1
+        if ($null -ne $na -and $na.MacAddress) { $mac = $na.MacAddress }
+    }
+    catch { }
+    if (-not $mac) {
+        try {
+            $cfgs = @(Get-CimInstance -ClassName Win32_NetworkAdapterConfiguration -Filter 'IPEnabled=True' -ErrorAction Stop)
+            foreach ($cfg in $cfgs) {
+                if ($cfg.MACAddress) {
+                    $mac = ($cfg.MACAddress -replace ':', '-')
+                    break
+                }
+            }
+        }
+        catch { }
+    }
+    return @{
+        os_caption      = $caption
+        mac_address     = $mac
+        machine_serial  = $serial
+    }
+}
+
+function Register-CadeVoceDevice {
+    param([string]$BaseUrl)
+    $agentRoot = Join-Path $env:LOCALAPPDATA 'CadeVoceAgent'
+    $marker = Join-Path $agentRoot '.device_registered'
+    if (Test-Path -LiteralPath $marker) {
+        return
+    }
+    if (-not (Test-Path -LiteralPath $agentRoot)) {
+        New-Item -ItemType Directory -Path $agentRoot -Force | Out-Null
+    }
+    $estado = 'SP'
+    if ($env:CADEVOCE_ESTADO_PERMITIDO -and $env:CADEVOCE_ESTADO_PERMITIDO.Trim()) {
+        $estado = $env:CADEVOCE_ESTADO_PERMITIDO.Trim()
+    }
+    $regBody = @{
+        hostname          = $env:COMPUTERNAME
+        username          = $env:USERNAME
+        estado_permitido  = $estado
+    } | ConvertTo-Json -Compress
+    try {
+        Invoke-RestMethod -Uri ('{0}/devices' -f $BaseUrl) -Method Post -ContentType 'application/json' -Body $regBody -TimeoutSec 25 | Out-Null
+        Set-Content -LiteralPath $marker -Value (Get-Date).ToUniversalTime().ToString('o') -Encoding UTF8
+        Write-Log -Message 'Primeiro cadastro em /devices concluido.' -Level 'INFO'
+    }
+    catch {
+        Write-Log -Message ('Falha em /devices (tentara de novo ate criar o marcador): {0}' -f $_.Exception.Message) -Level 'WARN'
+    }
+}
+
 function Get-CadeVoceHostMetrics {
     $bootIso = $null
     $uptimeSec = $null
@@ -202,6 +287,9 @@ function Get-GeoHelperJson {
 }
 
 try {
+    Register-CadeVoceDevice -BaseUrl $ApiUrl
+    $inventory = Get-CadeVoceInventory
+
     $useGps = $false
     $lat = $null
     $lon = $null
@@ -295,16 +383,19 @@ try {
             throw 'IP publico vazio'
         }
         $body = [ordered]@{
-            hostname         = $env:COMPUTERNAME
-            username         = $env:USERNAME
-            source           = 'ip'
-            latitude         = $null
-            longitude        = $null
-            accuracy         = $null
-            ip               = $publicIp
-            timestamp        = (Get-Date).ToUniversalTime().ToString('o')
-            last_boot_utc    = $hostMetrics.last_boot_utc
-            uptime_seconds   = $hostMetrics.uptime_seconds
+            hostname          = $env:COMPUTERNAME
+            username          = $env:USERNAME
+            source            = 'ip'
+            latitude          = $null
+            longitude         = $null
+            accuracy          = $null
+            ip                = $publicIp
+            timestamp         = (Get-Date).ToUniversalTime().ToString('o')
+            last_boot_utc     = $hostMetrics.last_boot_utc
+            uptime_seconds    = $hostMetrics.uptime_seconds
+            os_caption        = $inventory.os_caption
+            mac_address       = $inventory.mac_address
+            machine_serial    = $inventory.machine_serial
         }
     }
     else {
@@ -316,35 +407,31 @@ try {
         }
         $checkinSource = if ($gpsOrigin -eq 'serial') { 'gps_serial' } else { 'gps' }
         $body = [ordered]@{
-            hostname         = $env:COMPUTERNAME
-            username         = $env:USERNAME
-            source           = $checkinSource
-            latitude         = $lat
-            longitude        = $lon
-            accuracy         = $acc
-            ip               = $publicIp
-            timestamp        = (Get-Date).ToUniversalTime().ToString('o')
-            last_boot_utc    = $hostMetrics.last_boot_utc
-            uptime_seconds   = $hostMetrics.uptime_seconds
+            hostname          = $env:COMPUTERNAME
+            username          = $env:USERNAME
+            source            = $checkinSource
+            latitude          = $lat
+            longitude         = $lon
+            accuracy          = $acc
+            ip                = $publicIp
+            timestamp         = (Get-Date).ToUniversalTime().ToString('o')
+            last_boot_utc     = $hostMetrics.last_boot_utc
+            uptime_seconds    = $hostMetrics.uptime_seconds
+            os_caption        = $inventory.os_caption
+            mac_address       = $inventory.mac_address
+            machine_serial    = $inventory.machine_serial
         }
     }
 
     $json = $body | ConvertTo-Json -Depth 5 -Compress
 
-    # DEBUG temporario - teste local (remover apos validar)
-    Write-Host ''
-    Write-Host '=== CADEVOCE DEBUG ===' -ForegroundColor Cyan
-    Write-Host ('  source (enviado):    {0}' -f $body.source)
-    Write-Host ('  latitude capturada:  {0}' -f $(if ($null -ne $lat) { $lat } else { '(n/d)' }))
-    Write-Host ('  longitude capturada: {0}' -f $(if ($null -ne $lon) { $lon } else { '(n/d)' }))
-    Write-Host ('  accuracy (m):        {0}' -f $(if ($null -ne $acc) { $acc } else { '(n/d)' }))
-    if ($gpsOrigin) {
-        Write-Host ('  origem GPS:          {0}' -f $gpsOrigin) -ForegroundColor DarkCyan
+    if ($env:CADEVOCE_DEBUG -eq '1') {
+        Write-Host ''
+        Write-Host '=== CADEVOCE DEBUG ===' -ForegroundColor Cyan
+        Write-Host ('  source: {0}' -f $body.source)
+        Write-Host ('  JSON: {0}' -f $json) -ForegroundColor DarkGray
+        Write-Host '======================' -ForegroundColor Cyan
     }
-    Write-Host '  JSON enviado a API:'
-    Write-Host ('  {0}' -f $json) -ForegroundColor DarkGray
-    Write-Host '======================' -ForegroundColor Cyan
-    Write-Host ''
 
     $headers = @{
         'Content-Type' = 'application/json'

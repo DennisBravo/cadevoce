@@ -59,6 +59,10 @@ class Checkin(Base):
         DateTime(timezone=True), nullable=True
     )
     uptime_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Inventário enviado pelo agente (último check-in)
+    os_caption: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    mac_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    machine_serial: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     device: Mapped["Device"] = relationship(back_populates="checkins")
 
@@ -117,6 +121,12 @@ def _migrate_sqlite_checkins(connection) -> None:
         statements.append("ALTER TABLE checkins ADD COLUMN last_boot_utc TIMESTAMP")
     if "uptime_seconds" not in existing:
         statements.append("ALTER TABLE checkins ADD COLUMN uptime_seconds REAL")
+    if "os_caption" not in existing:
+        statements.append("ALTER TABLE checkins ADD COLUMN os_caption VARCHAR(512)")
+    if "mac_address" not in existing:
+        statements.append("ALTER TABLE checkins ADD COLUMN mac_address VARCHAR(64)")
+    if "machine_serial" not in existing:
+        statements.append("ALTER TABLE checkins ADD COLUMN machine_serial VARCHAR(128)")
     for stmt in statements:
         connection.execute(text(stmt))
 

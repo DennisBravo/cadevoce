@@ -38,6 +38,21 @@ class CheckinBody(BaseModel):
         ge=0,
         description="Segundos desde o boot no momento do check-in",
     )
+    os_caption: str | None = Field(
+        None,
+        max_length=512,
+        description="SO (ex.: Microsoft Windows 11 Pro + build)",
+    )
+    mac_address: str | None = Field(
+        None,
+        max_length=64,
+        description="MAC da interface de rede principal (formato livre)",
+    )
+    machine_serial: str | None = Field(
+        None,
+        max_length=128,
+        description="Serial de hardware (BIOS / placa)",
+    )
 
     @model_validator(mode="after")
     def validar_fonte(self):
@@ -148,6 +163,14 @@ async def checkin(body: CheckinBody):
             if up_sec is not None and up_sec > 366 * 24 * 3600:
                 up_sec = None
 
+            def _clip(s: str | None, n: int) -> str | None:
+                if s is None:
+                    return None
+                t = str(s).strip()
+                if not t:
+                    return None
+                return t[:n]
+
             row = Checkin(
                 device_id=device.id,
                 ip=ip_stored,
@@ -165,6 +188,9 @@ async def checkin(body: CheckinBody):
                 accuracy=raw_acc if src in ("gps", "gps_serial") else None,
                 last_boot_utc=boot_dt,
                 uptime_seconds=up_sec,
+                os_caption=_clip(body.os_caption, 512),
+                mac_address=_clip(body.mac_address, 64),
+                machine_serial=_clip(body.machine_serial, 128),
             )
             session.add(row)
             await session.commit()

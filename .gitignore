@@ -8,3 +8,10 @@ __pycache__/
 .vscode/
 agent/GeoHelper/bin/
 agent/GeoHelper/obj/
+agent/GeoHelper/publish/
+agent/CadeVoce-ScheduledLauncher.vbs
+agent/Installer/bin/
+agent/Installer/obj/
+agent/Installer/payload.zip
+agent/Installer/InstallSettings.json
+*.zip

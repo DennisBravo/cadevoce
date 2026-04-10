@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  WiX Toolset v3: gera .msi que copia CadeVoceAgent-Setup.exe e executa ao final (instalacao silenciosa do agente).
+  Compile: candle -dSourceDir="CAMINHO_DA_PASTA_DO_EXE" Product.wxs && light -out CadeVoceAgent.msi Product.wixobj
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product
+    Id="*"
+    Name="Cadê Você — Agente"
+    Language="1046"
+    Version="1.0.0.0"
+    Manufacturer="Bravo Ti"
+    UpgradeCode="B8F3E4D2-1A5C-4E9F-8B7A-6D5C4E3F2A10">
+    <Package
+      InstallerVersion="200"
+      Compressed="yes"
+      InstallScope="perUser"
+      Description="Agente de check-in Cadê Você"
+      Comments="Executa o instalador embutido após copiar os ficheiros." />
+
+    <MajorUpgrade DowngradeErrorMessage="Já está instalada uma versão mais recente." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="ProductFeature" Title="Agente Cadê Você" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+    </Feature>
+
+    <!-- Após copiar o .exe, executa-o (mesmo fluxo que duplo clique no .exe). Não corre na desinstalação. -->
+    <CustomAction
+      Id="RunAgentSetup"
+      FileKey="SetupExeFile"
+      ExeCommand=""
+      Execute="commit"
+      Return="asyncNoWait"
+      Impersonate="yes" />
+    <InstallExecuteSequence>
+      <Custom Action="RunAgentSetup" After="InstallFiles">NOT REMOVE</Custom>
+    </InstallExecuteSequence>
+  </Product>
+
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="LocalAppDataFolder">
+        <Directory Id="INSTALLFOLDER" Name="CadeVoceAgentSetup">
+          <Component Id="CmpSetupExe" Guid="*">
+            <File
+              Id="SetupExeFile"
+              Source="$(var.SourceDir)\CadeVoceAgent-Setup.exe"
+              KeyPath="yes" />
+          </Component>
+        </Directory>
+      </Directory>
+    </Directory>
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="ProductComponents">
+      <ComponentRef Id="CmpSetupExe" />
+    </ComponentGroup>
+  </Fragment>
+</Wix>

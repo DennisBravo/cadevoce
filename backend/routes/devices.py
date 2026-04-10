@@ -23,6 +23,11 @@ class DeviceCreate(BaseModel):
     hostname: str = Field(..., max_length=255)
     username: str = Field(..., max_length=255)
     estado_permitido: str = Field(..., max_length=64, description="Ex.: SP, RJ (BR) ou código de região do ipinfo")
+    update_estado_if_exists: bool = Field(
+        False,
+        description="Se true, atualiza estado_permitido quando hostname+usuário já existem; "
+        "se false (padrão), mantém o cadastro existente (uso do agente).",
+    )
 
 
 class DeviceRow(BaseModel):
@@ -42,6 +47,9 @@ class DeviceRow(BaseModel):
     accuracy: float | None = None
     last_boot_utc: datetime | None = None
     uptime_seconds: float | None = None
+    os_caption: str | None = None
+    mac_address: str | None = None
+    machine_serial: str | None = None
 
     model_config = {"from_attributes": False}
 
@@ -69,9 +77,14 @@ async def register_device(body: DeviceCreate):
         )
         existing = r.scalar_one_or_none()
         if existing:
-            existing.estado_permitido = body.estado_permitido.strip()
+            if body.update_estado_if_exists:
+                existing.estado_permitido = body.estado_permitido.strip()
             await session.commit()
-            return {"ok": True, "id": existing.id, "updated": True}
+            return {
+                "ok": True,
+                "id": existing.id,
+                "updated": bool(body.update_estado_if_exists),
+            }
 
         d = Device(
             hostname=body.hostname.strip(),
@@ -129,6 +142,9 @@ async def list_devices():
                     accuracy=checkin.accuracy,
                     last_boot_utc=checkin.last_boot_utc,
                     uptime_seconds=checkin.uptime_seconds,
+                    os_caption=checkin.os_caption,
+                    mac_address=checkin.mac_address,
+                    machine_serial=checkin.machine_serial,
                 )
             )
 

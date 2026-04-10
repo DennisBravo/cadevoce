@@ -1,7 +1,7 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-    Registra a tarefa agendada "CadeVoce-Agent" (check-in a cada 10 min, ao logon).
+    Registra a tarefa agendada "CadeVoce-Agent" (repetição configurável, ao logon).
 
 .DESCRIPTION
     Cria uma Scheduled Task para o usuário atual: executa agent.ps1 sem janela visível
@@ -21,19 +21,28 @@
 
 .PARAMETER GpsBaud
     Baud rate serial (ex.: 9600, 115200). 0 = não define (agente usa 9600).
+
+.PARAMETER IntervalMinutes
+    Intervalo da repetição da tarefa em minutos (1–1439). Padrão: 10.
+
+.PARAMETER EstadoPermitido
+    Estado (UF) usado no cadastro automático do dispositivo na API (ex.: SP). Padrão: SP.
 #>
 param(
     [string]$ApiUrl = 'http://127.0.0.1:8000',
     [string]$ApiKey = 'changeme',
     [string]$GpsCom = '',
-    [int]$GpsBaud = 0
+    [int]$GpsBaud = 0,
+    [ValidateRange(1, 1439)]
+    [int]$IntervalMinutes = 10,
+    [string]$EstadoPermitido = 'SP'
 )
 
 $ErrorActionPreference = 'Stop'
 
 # Nome e metadados da tarefa
 $TaskName = 'CadeVoce-Agent'
-$Description = 'Agente de rastreamento Cadê Você — check-in a cada 10 min'
+$Description = "Agente de rastreamento Cadê Você — check-in a cada $IntervalMinutes min"
 
 # Caminho do script do agente (mesma pasta deste instalador)
 $ScriptPath = Join-Path $PSScriptRoot 'agent.ps1'
@@ -54,9 +63,10 @@ function Escape-SingleQuote {
 $escUrl = Escape-SingleQuote $ApiUrl
 $escKey = Escape-SingleQuote $ApiKey
 $escScript = Escape-SingleQuote $ScriptPath
+$escEstado = Escape-SingleQuote ($EstadoPermitido.Trim())
 
 # Define variáveis de ambiente e executa o script
-$psCommand = "`$env:CADEVOCE_API_URL='$escUrl'; `$env:CADEVOCE_API_KEY='$escKey'"
+$psCommand = "`$env:CADEVOCE_API_URL='$escUrl'; `$env:CADEVOCE_API_KEY='$escKey'; `$env:CADEVOCE_ESTADO_PERMITIDO='$escEstado'"
 if ($GpsCom -and $GpsCom.Trim()) {
     $escCom = Escape-SingleQuote $GpsCom.Trim()
     $psCommand += "; `$env:CADEVOCE_GPS_COM='$escCom'"
@@ -89,10 +99,10 @@ $action = New-ScheduledTaskAction `
     -Argument "//B //Nologo `"$launcherVbs`"" `
     -WorkingDirectory $PSScriptRoot
 
-# Gatilho: ao fazer login + repetição a cada 10 minutos (duração longa; o Agendador limita o valor máximo de “indefinido” na API)
+# Gatilho: ao fazer login + repetição (duração longa; o Agendador limita o valor máximo de “indefinido” na API)
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $UserId
 $repeatTemplate = New-ScheduledTaskTrigger -Once -At (Get-Date).Date `
-    -RepetitionInterval (New-TimeSpan -Minutes 10) `
+    -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes) `
     -RepetitionDuration (New-TimeSpan -Days 3650)
 $trigger.Repetition = $repeatTemplate.Repetition
 
@@ -123,6 +133,7 @@ try {
         -Description $Description | Out-Null
 
     Write-Host "Sucesso: tarefa '$TaskName' registrada para o usuário $UserId." -ForegroundColor Green
+    Write-Host "  Intervalo: $IntervalMinutes min"
     Write-Host "  CADEVOCE_API_URL=$ApiUrl"
     if ($GpsCom -and $GpsCom.Trim()) {
         Write-Host "  CADEVOCE_GPS_COM=$($GpsCom.Trim())"
